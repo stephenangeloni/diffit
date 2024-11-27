@@ -24,10 +24,11 @@
 		}
 		
 		.text-column {
-			flex: 1;
+			flex: 1 1 33.333%;
 			display: flex;
 			flex-direction: column;
 			position: relative;
+			max-width: 33.333%;
 		}
 		
 		.editable-area {
@@ -44,7 +45,7 @@
 		}
 		
 		.result-column {
-			flex: 1;
+			flex: 1 1 33.333%;
 			overflow-y: auto;
 			border: 1px solid #ccc;
 			padding: 10px;
@@ -55,6 +56,7 @@
 			transition: all 0.3s ease;
 			position: relative;
 			z-index: 1;
+			max-width: 33.333%;
 		}
 		
 		.result-column.focused {
@@ -64,6 +66,7 @@
 			width: 80%;
 			height: 80%;
 			background: white;
+			
 			box-shadow: 0 0 20px rgba(0,0,0,0.2);
 			z-index: 1000;
 			transform: none;
@@ -136,6 +139,20 @@
 			font-size: 14px;
 			line-height: 1.4;
 		}
+		
+		#swap_button {
+			padding: 5px 10px;
+			font-size: 16px;
+			cursor: pointer;
+			margin-left: 10px;
+			border: 1px solid #ccc;
+			background: white;
+			border-radius: 4px;
+		}
+		
+		#swap_button:hover {
+			background: #f0f0f0;
+		}
 	</style>
 </head>
 <body>
@@ -150,6 +167,7 @@
 			<option value="diffPatch">Patch</option>
 		</select>
 	</div>
+	<button id="swap_button" title="Swap contents">⇄</button>
 </div>
 
 <div class="container">
@@ -307,12 +325,42 @@ function onDiffTypeChange(select) {
 	document.title = "Diff " + select.value.slice(4);
 }
 
+function swapContents() {
+    const aElement = document.getElementById('a');
+    const bElement = document.getElementById('b');
+    
+    // Swap the text contents
+    const tempContent = getTextContent(aElement);
+    aElement.innerHTML = getTextContent(bElement).replace(/\n/g, '<br>');
+    bElement.innerHTML = tempContent.replace(/\n/g, '<br>');
+    
+    // Swap the file names and input values
+    const fileA = document.getElementById('file_a');
+    const fileB = document.getElementById('file_b');
+    const tempFiles = fileA.files;
+    fileA.files = fileB.files;
+    fileB.files = tempFiles;
+    
+    // Swap the displayed file names
+    const nameA = document.getElementById('file_name_a');
+    const nameB = document.getElementById('file_name_b');
+    const tempName = nameA.textContent;
+    nameA.textContent = nameB.textContent;
+    nameB.textContent = tempName;
+    
+    // Update the diff
+    changed();
+}
+
 window.onload = function() {
 	const diffSelect = document.getElementById('diff_type');
 	onDiffTypeChange(diffSelect);
 	a.dataset.originalContent = a.textContent;
 	b.dataset.originalContent = b.textContent;
 	changed();
+	
+	// Add swap button handler
+	document.getElementById('swap_button').onclick = swapContents;
 };
 
 document.getElementById('diff_type').onchange = function(e) {
