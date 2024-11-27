@@ -4,6 +4,8 @@
 	<meta charset="utf-8">
 	<title>Diff IT</title>
 	<style>
+		@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&display=swap');
+		
 		body {
 			margin: 0;
 			padding: 20px;
@@ -39,7 +41,7 @@
 			box-sizing: border-box;
 			overflow-y: auto;
 			white-space: pre-wrap;
-			font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+			font-family: "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 			font-size: 14px;
 			line-height: 1.4;
 		}
@@ -50,26 +52,13 @@
 			border: 1px solid #ccc;
 			padding: 10px;
 			box-sizing: border-box;
-			font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+			font-family: "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 			font-size: 14px;
 			line-height: 1.4;
 			transition: all 0.3s ease;
 			position: relative;
 			z-index: 1;
 			max-width: 33.333%;
-		}
-		
-		.result-column.focused {
-			position: fixed;
-			left: 10%;
-			top: 10%;
-			width: 80%;
-			height: 80%;
-			background: white;
-			
-			box-shadow: 0 0 20px rgba(0,0,0,0.2);
-			z-index: 1000;
-			transform: none;
 		}
 		
 		.overlay {
@@ -135,7 +124,7 @@
 		
 		.result-column pre {
 			margin: 0;
-			font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+			font-family: "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 			font-size: 14px;
 			line-height: 1.4;
 		}
@@ -152,6 +141,33 @@
 		
 		#swap_button:hover {
 			background: #f0f0f0;
+		}
+		
+		.modal {
+			display: none;
+			position: fixed;
+			left: 5vw;
+			top: 5vh;
+			width: 90vw;
+			height: 90vh;
+			background: white;
+			box-shadow: 0 0 20px rgba(0,0,0,0.2);
+			z-index: 1000;
+			padding: 20px;
+			box-sizing: border-box;
+			overflow: auto;
+			font-family: "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+		}
+		
+		.modal.active {
+			display: block;
+		}
+		
+		.modal pre {
+			margin: 0;
+			font-family: "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+			font-size: 14px;
+			line-height: 1.4;
 		}
 	</style>
 </head>
@@ -207,23 +223,31 @@ const overlay = document.createElement('div');
 overlay.className = 'overlay';
 document.body.appendChild(overlay);
 
-// Add focus handlers for the result area
+// Create modal element
+const modal = document.createElement('div');
+modal.className = 'modal';
+const modalContent = document.createElement('pre');
+modal.appendChild(modalContent);
+document.body.appendChild(modal);
+
+// Update focus handlers
 result.parentElement.addEventListener('click', function(e) {
-    if (!result.parentElement.classList.contains('focused')) {
-        result.parentElement.classList.add('focused');
+    if (!modal.classList.contains('active')) {
+        modal.classList.add('active');
         overlay.classList.add('active');
+        modalContent.innerHTML = result.innerHTML;
     }
 });
 
 overlay.addEventListener('click', function() {
-    result.parentElement.classList.remove('focused');
+    modal.classList.remove('active');
     overlay.classList.remove('active');
 });
 
-// Add escape key handler
+// Update escape key handler
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && result.parentElement.classList.contains('focused')) {
-        result.parentElement.classList.remove('focused');
+    if (e.key === 'Escape' && modal.classList.contains('active')) {
+        modal.classList.remove('active');
         overlay.classList.remove('active');
     }
 });
