@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<title>Diff IT</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 20px;
+			height: 100vh;
+			box-sizing: border-box;
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+		}
+		
+		#settings {
+			margin-bottom: 20px;
+			text-align: center;
+		}
+		
+		.container {
+			display: flex;
+			gap: 20px;
+			height: calc(100vh - 100px);
+		}
+		
+		.text-column {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			position: relative;
+		}
+		
+		.editable-area {
+			width: 100%;
+			height: 100%;
+			border: 1px solid #ccc;
+			padding: 10px;
+			box-sizing: border-box;
+			overflow-y: auto;
+			white-space: pre-wrap;
+			font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+			font-size: 14px;
+			line-height: 1.4;
+		}
+		
+		.result-column {
+			flex: 1;
+			overflow-y: auto;
+			border: 1px solid #ccc;
+			padding: 10px;
+			box-sizing: border-box;
+			font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+			font-size: 14px;
+			line-height: 1.4;
+			transition: all 0.3s ease;
+			position: relative;
+			z-index: 1;
+		}
+		
+		.result-column.focused {
+			position: fixed;
+			left: 10%;
+			top: 10%;
+			width: 80%;
+			height: 80%;
+			background: white;
+			box-shadow: 0 0 20px rgba(0,0,0,0.2);
+			z-index: 1000;
+			transform: none;
+		}
+		
+		.overlay {
+			display: none;
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0,0,0,0.5);
+			z-index: 999;
+		}
+		
+		.overlay.active {
+			display: block;
+		}
+		
+		del {
+			text-decoration: none;
+			background-color: #fdb8c0;
+		}
+		
+		ins {
+			text-decoration: none;
+			background-color: #acf2bd;
+		}
+		
+		.chunk-header {
+			color: #666;
+		}
+		
+		.file-input-container {
+			position: absolute;
+			top: -30px;
+			left: 0;
+			right: 0;
+			text-align: center;
+		}
+		
+		select {
+			padding: 5px 10px;
+			font-size: 16px;
+			margin: 0 10px;
+		}
+		
+		.diff-select-container {
+			display: inline-block;
+		}
+		
+		h1 {
+			margin-bottom: 15px;
+		}
+		
+		.file-name {
+			margin-left: 10px;
+			font-size: 0.9em;
+			color: #666;
+		}
+		
+		.modified {
+			color: #e65100;
+		}
+		
+		.result-column pre {
+			margin: 0;
+			font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+			font-size: 14px;
+			line-height: 1.4;
+		}
+	</style>
+</head>
+<body>
+
+<div id="settings">
+	<div class="diff-select-container">
+		<label for="diff_type">Diff IT:</label>
+		<select id="diff_type" name="diff_type">
+			<option value="diffChars">Chars</option>
+			<option value="diffWords">Words</option>
+			<option value="diffLines" selected>Lines</option>
+			<option value="diffPatch">Patch</option>
+		</select>
+	</div>
+</div>
+
+<div class="container">
+	<div class="text-column">
+		<div class="file-input-container">
+			<input type="file" id="file_a" onchange="loadFile(this, 'a')">
+			<span id="file_name_a" class="file-name"></span>
+		</div>
+		<div contenteditable="true" id="a" class="editable-area">restaurant</div>
+	</div>
+	<div class="result-column">
+		<pre id="result"></pre>
+	</div>
+	<div class="text-column">
+		<div class="file-input-container">
+			<input type="file" id="file_b" onchange="loadFile(this, 'b')">
+			<span id="file_name_b" class="file-name"></span>
+		</div>
+		<div contenteditable="true" id="b" class="editable-area">aura</div>
+	</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/7.0.0/diff.min.js"></script>
+<script defer>
+var a = document.getElementById('a');
+var b = document.getElementById('b');
+var result = document.getElementById('result');
+
+// Create overlay element
+const overlay = document.createElement('div');
+overlay.className = 'overlay';
+document.body.appendChild(overlay);
+
+// Add focus handlers for the result area
+result.parentElement.addEventListener('click', function(e) {
+    if (!result.parentElement.classList.contains('focused')) {
+        result.parentElement.classList.add('focused');
+        overlay.classList.add('active');
+    }
+});
+
+overlay.addEventListener('click', function() {
+    result.parentElement.classList.remove('focused');
+    overlay.classList.remove('active');
+});
+
+// Add escape key handler
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && result.parentElement.classList.contains('focused')) {
+        result.parentElement.classList.remove('focused');
+        overlay.classList.remove('active');
+    }
+});
+
+function getTextContent(element) {
+    // Replace <br> and <div> with newlines, then normalize line endings
+    let text = element.innerHTML
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<div>/gi, '\n')
+        .replace(/<\/div>/gi, '');
+    
+    // Decode HTML entities and remove any remaining HTML tags
+    let temp = document.createElement('div');
+    temp.innerHTML = text;
+    text = temp.textContent || temp.innerText;
+    
+    // Normalize line endings
+    return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+function changed() {
+	var fragment = document.createDocumentFragment();
+	var diff;
+	if (window.diffType === 'diffPatch') {
+		var pastHunkHeader = false;
+		diff = Diff.createTwoFilesPatch('a.txt', 'b.txt', 
+			getTextContent(a), 
+			getTextContent(b))
+			.split('\n')
+			.map(function(entry) {
+				const result = {
+					value: entry + '\n',
+				};
+				if (entry.startsWith('@@')) {
+					result.chunkHeader = true;
+					pastHunkHeader = true;
+				} else if (pastHunkHeader) {
+					if (entry.startsWith('-')) {
+						result.removed = true;
+					} else if (entry.startsWith('+')) {
+						result.added = true;
+					}
+				}
+				return result;
+			});
+	} else {
+		diff = Diff[window.diffType](getTextContent(a), getTextContent(b));
+	}
+
+	for (var i=0; i < diff.length; i++) {
+
+		if (diff[i].added && diff[i + 1] && diff[i + 1].removed) {
+			var swap = diff[i];
+			diff[i] = diff[i + 1];
+			diff[i + 1] = swap;
+		}
+
+		var node;
+		if (diff[i].removed) {
+			node = document.createElement('del');
+			node.appendChild(document.createTextNode(diff[i].value));
+		} else if (diff[i].added) {
+			node = document.createElement('ins');
+			node.appendChild(document.createTextNode(diff[i].value));
+		} else if (diff[i].chunkHeader) {
+			node = document.createElement('span');
+			node.setAttribute('class', 'chunk-header');
+			node.appendChild(document.createTextNode(diff[i].value));
+		} else {
+			node = document.createTextNode(diff[i].value);
+		}
+		fragment.appendChild(node);
+	}
+
+	result.textContent = '';
+	result.appendChild(fragment);
+	
+	checkModified(a, 'a');
+	checkModified(b, 'b');
+}
+
+function loadFile(input, targetId) {
+	const file = input.files[0];
+	if (file) {
+		const reader = new FileReader();
+		reader.onload = function(e) {
+			const element = document.getElementById(targetId);
+			element.textContent = e.target.result;
+			element.dataset.originalContent = e.target.result;
+			updateFileName(targetId, file.name);
+			changed();
+		};
+		reader.readAsText(file);
+	}
+}
+
+function onDiffTypeChange(select) {
+	window.diffType = select.value;
+	document.title = "Diff " + select.value.slice(4);
+}
+
+window.onload = function() {
+	const diffSelect = document.getElementById('diff_type');
+	onDiffTypeChange(diffSelect);
+	a.dataset.originalContent = a.textContent;
+	b.dataset.originalContent = b.textContent;
+	changed();
+};
+
+document.getElementById('diff_type').onchange = function(e) {
+	onDiffTypeChange(e.target);
+	changed();
+};
+
+a.onpaste = a.onchange =
+b.onpaste = b.onchange = changed;
+
+if ('oninput' in a) {
+	a.oninput = b.oninput = changed;
+} else {
+	a.onkeyup = b.onkeyup = changed;
+}
+
+// Add handler for Enter key to insert proper line breaks
+function handleEnter(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.execCommand('insertLineBreak');
+        changed();
+    }
+}
+
+a.addEventListener('keydown', handleEnter);
+b.addEventListener('keydown', handleEnter);
+
+function updateFileName(side, fileName, modified = false) {
+    const nameElement = document.getElementById(`file_name_${side}`);
+    nameElement.textContent = fileName + (modified ? ' (modified)' : '');
+    nameElement.classList.toggle('modified', modified);
+}
+
+function checkModified(element, side) {
+    const originalContent = element.dataset.originalContent;
+    if (originalContent !== undefined) {
+        const currentContent = getTextContent(element);
+        const isModified = originalContent !== currentContent;
+        const fileName = document.getElementById(`file_${side}`).files[0]?.name || '';
+        if (fileName) {
+            updateFileName(side, fileName, isModified);
+        }
+    }
+}
+</script>
+</body>
+</html>
